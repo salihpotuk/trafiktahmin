@@ -1,0 +1,109 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trafik Durumu Tahmini</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="bg-gradient-to-br from-blue-900 to-gray-800 min-h-screen flex items-center justify-center">
+    <div class="container max-w-lg mx-auto p-6 bg-white bg-opacity-90 rounded-xl shadow-2xl transform transition-all duration-300 hover:scale-105">
+        <h1 class="text-3xl font-bold text-center text-blue-900 mb-6">Trafik Durumu Tahmini</h1>
+        <form action="/predict" method="post" class="space-y-4">
+            <div>
+                <label for="day" class="block text-sm font-medium text-gray-700">Gün</label>
+                <select name="day" id="day" class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-200" required>
+                    <option value="" disabled selected>Gün Seçin</option>
+                    <option value="Monday">Pazartesi</option>
+                    <option value="Tuesday">Salı</option>
+                    <option value="Wednesday">Çarşamba</option>
+                    <option value="Thursday">Perşembe</option>
+                    <option value="Friday">Cuma</option>
+                    <option value="Saturday">Cumartesi</option>
+                    <option value="Sunday">Pazar</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="hour" class="block text-sm font-medium text-gray-700">Saat</label>
+                <input type="number" name="hour" id="hour" min="0" max="23" class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-200" placeholder="0-23 arası" required>
+            </div>
+
+            <div>
+                <label for="weather" class="block text-sm font-medium text-gray-700">Hava Durumu</label>
+                <select name="weather" id="weather" class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-200" required>
+                <option value="Güneşli">Güneşli</option>
+                <option value="Sisli">Sisli</option>
+                <option value="Karlı">Karlı</option>
+                <option value="Yağmurlu">Yağmurlu</option>
+                <option value="Parçalı Bulutlu">Parçalı Bulutlu</option>
+                <option value="Bulutlu">Bulutlu</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="temperature" class="block text-sm font-medium text-gray-700">Sıcaklık (°C)</label>
+                <input type="number" name="temperature" id="temperature" min="-20" max="50" class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-200" placeholder="-20 ile 50 arası" required>
+            </div>
+
+            <button type="submit" class="w-full p-3 bg-green-600 text-white rounded-md shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-300 transform hover:scale-105">Tahmin Yap</button>
+        </form>
+
+        {% if prediction %}
+            <div class="mt-6 p-4 bg-blue-100 rounded-md shadow-md animate-fade-in">
+                <h2 class="text-xl font-semibold text-blue-900">{{ prediction }}</h2>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Form gönderildiğinde sayfayı yenilemeden animasyonlu geçiş
+        document.querySelector('form').addEventListener('submit', function() {
+            document.querySelector('.container').classList.add('animate-pulse');
+            setTimeout(() => {
+                document.querySelector('.container').classList.remove('animate-pulse');
+            }, 500);
+        });
+    </script>
+</body>
+</html>
